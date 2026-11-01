@@ -85,3 +85,18 @@ export interface MousePosition {
   velocityY: number;
   speed: number;
 }
+
+export interface ParticleSystemConfig {
+  particleCount: number;
+  mouseRepulsionRadius: number;
+  mouseForce: number;
+  shockwaveSpeed: number;
+  anamorphicBokehRatio: number;
+}
+
+export interface LiquidDistortionConfig {
+  waveIntensity: number;
+  easeDurationMs: number;
+  chromaticDispersion: number;
+}
+

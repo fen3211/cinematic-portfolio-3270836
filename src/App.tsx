@@ -8,6 +8,10 @@ import { useReducedMotion } from './hooks/useReducedMotion';
 import { SectionType } from './types';
 import { CINEMATOGRAPHER_PROFILE, PORTFOLIO_PROJECTS } from './data/portfolioData';
 import { ArrowDownRight, Play, Film, Disc3, Mail } from 'lucide-react';
+import { LiquidLensCursor } from './components/canvas/LiquidLensCursor';
+import { ParticleUniverseCanvas } from './components/canvas/ParticleUniverseCanvas';
+import { LiquidImageDistortion } from './components/canvas/LiquidImageDistortion';
+import { startAmbientDrone, stopAmbientDrone } from './utils/audioSynth';
 
 export const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<SectionType>('hero');
@@ -28,11 +32,22 @@ export const App: React.FC = () => {
   };
 
   const handleToggleAudio = () => {
-    setIsAudioMuted((prev) => !prev);
+    setIsAudioMuted((prev) => {
+      const next = !prev;
+      if (!next) {
+        startAmbientDrone();
+      } else {
+        stopAmbientDrone();
+      }
+      return next;
+    });
   };
 
   return (
     <div className="relative min-h-screen bg-[#080808] text-[#F5F5F5] font-sans selection:bg-[#E09F3E] selection:text-[#080808]">
+      {/* High-Refraction Optical Glass Lens Cursor */}
+      <LiquidLensCursor />
+
       {/* 35mm Emulsion Film Grain Overlay */}
       <NoiseOverlay opacity={0.045} />
 
@@ -128,9 +143,14 @@ export const App: React.FC = () => {
         {/* SECTION 02: OPTICAL PHYSICS & ATMOSPHERE */}
         <section
           id="particles"
-          className="relative min-h-[70vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 py-24 border-b border-[#292929] bg-[#0c0c0c]"
+          className="relative min-h-[75vh] flex flex-col justify-center px-6 md:px-12 lg:px-20 py-24 border-b border-[#292929] bg-[#0c0c0c] overflow-hidden"
         >
-          <div className="max-w-4xl">
+          {/* Real-Time Three.js Atmospheric Cinema Particle Stage */}
+          <div className="absolute inset-0 z-0 opacity-80 pointer-events-auto">
+            <ParticleUniverseCanvas />
+          </div>
+
+          <div className="relative z-10 max-w-4xl pointer-events-none">
             <div className="font-mono text-xs tracking-widest text-[#888888] uppercase mb-4">
               02 // OPTICAL PHYSICS & ATMOSPHERIC DISCIPLINE
             </div>
@@ -192,25 +212,27 @@ export const App: React.FC = () => {
               return (
                 <article
                   key={project.id}
-                  className={`${colSpan} group flex flex-col justify-between border border-[#292929] hover:border-[#888888] bg-[#111111]/60 transition-all duration-300 overflow-hidden`}
+                  data-cursor="film"
+                  data-cursor-label="VIEW REEL"
+                  data-cursor-secondary={`[ ${project.aspectRatio} ]`}
+                  className={`${colSpan} group flex flex-col justify-between border border-[#292929] hover:border-[#888888] bg-[#111111]/60 transition-all duration-300 overflow-hidden cursor-none`}
                 >
-                  {/* Media Aspect Container */}
+                  {/* Media Aspect Container with Real-Time WebGL Liquid Wave Distortion */}
                   <div className="relative aspect-video w-full overflow-hidden bg-[#161616]">
-                    <img
-                      src={project.posterUrl}
+                    <LiquidImageDistortion
+                      imageSrc={project.posterUrl}
                       alt={project.title}
-                      loading="lazy"
-                      className="h-full w-full object-cover grayscale contrast-125 group-hover:scale-105 group-hover:grayscale-0 transition-all duration-700 ease-out"
+                      aspectRatio="aspect-video"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-80" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#080808] via-transparent to-transparent opacity-80 pointer-events-none" />
 
                     {/* Aspect Badge */}
-                    <div className="absolute top-4 right-4 bg-[#080808]/80 border border-[#292929] px-2.5 py-1 font-mono text-[10px] text-[#E09F3E] tracking-wider">
+                    <div className="absolute top-4 right-4 bg-[#080808]/80 border border-[#292929] px-2.5 py-1 font-mono text-[10px] text-[#E09F3E] tracking-wider pointer-events-none">
                       {project.aspectRatio}
                     </div>
 
                     {/* Play Prompt */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                       <div className="h-12 w-12 rounded-full border border-[#F5F5F5] bg-[#080808]/80 flex items-center justify-center text-[#F5F5F5]">
                         <Play className="w-5 h-5 fill-[#F5F5F5] translate-x-0.5" />
                       </div>
