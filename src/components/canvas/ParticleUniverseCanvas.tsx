@@ -1,17 +1,68 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-interface ParticleUniverseCanvasProps {
+export type AtmosphericPreset = 'silver-dust' | 'solar-turbulence' | 'deep-space';
+
+export interface ParticleUniverseCanvasProps {
   className?: string;
   intensity?: number;
+  preset?: AtmosphericPreset;
+  shockwaveTrigger?: number;
 }
+
+const PRESET_CONFIGS: Record<
+  AtmosphericPreset,
+  {
+    primary: [number, number, number];
+    secondary: [number, number, number];
+    highlight: [number, number, number];
+    intensityMultiplier: number;
+  }
+> = {
+  'silver-dust': {
+    primary: [0.9, 0.9, 0.93],
+    secondary: [0.65, 0.7, 0.78],
+    highlight: [0.98, 0.98, 0.98],
+    intensityMultiplier: 0.85,
+  },
+  'solar-turbulence': {
+    primary: [0.98, 0.62, 0.22],
+    secondary: [0.92, 0.32, 0.08],
+    highlight: [1.0, 0.92, 0.65],
+    intensityMultiplier: 1.85,
+  },
+  'deep-space': {
+    primary: [0.25, 0.52, 0.82],
+    secondary: [0.12, 0.25, 0.58],
+    highlight: [0.75, 0.88, 1.0],
+    intensityMultiplier: 0.65,
+  },
+};
 
 export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
   className = '',
   intensity = 1.0,
+  preset = 'silver-dust',
+  shockwaveTrigger = 0,
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [particleCountDisplay, setParticleCountDisplay] = useState(12000);
+  const triggerRef = useRef<(() => void) | null>(null);
+  const updatePresetRef = useRef<((newPreset: AtmosphericPreset, newIntensity: number) => void) | null>(null);
+
+  // Trigger shockwave imperatively when prop updates
+  useEffect(() => {
+    if (shockwaveTrigger > 0 && triggerRef.current) {
+      triggerRef.current();
+    }
+  }, [shockwaveTrigger]);
+
+  // Update preset colors & intensity without recreating WebGL context
+  useEffect(() => {
+    if (updatePresetRef.current) {
+      updatePresetRef.current(preset, intensity);
+    }
+  }, [preset, intensity]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -100,6 +151,9 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       uniform float uMouseForce;
       uniform vec3 uShockwave; // x, y, progress (0 to 1)
       uniform float uIntensity;
+      uniform vec3 uColorPrimary;
+      uniform vec3 uColorSecondary;
+      uniform vec3 uColorHighlight;
 
       attribute vec3 originalPosition;
       attribute vec3 velocity;
@@ -137,13 +191,13 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
 
         float n_ = 1.0/7.0;
         vec3 ns = n_ * D.wyz - D.xzx;
-        vec4 j = p - 49.0 * floor(p * ns.z.xxxx);
+        vec4 j = p - 49.0 * floor(p * (ns.z * ns.z));
 
         vec4 x_ = floor(j * ns.z);
         vec4 y_ = floor(j - 7.0 * x_ );
 
-        vec4 x = x_ *ns.x + ns.yyyy;
-        vec4 y = y_ *ns.x + ns.yyyy;
+        vec4 x = x_ * ns.x + vec4(ns.y);
+        vec4 y = y_ * ns.x + vec4(ns.y);
         vec4 h = 1.0 - abs(x) - abs(y);
 
         vec4 b0 = vec4( x.xy, y.xy );
@@ -233,14 +287,10 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
         // Anamorphic bokeh size scaling with depth
         gl_PointSize = size * (260.0 / -mvPosition.z);
 
-        // Cinematic Color Palette: 3200K Tungsten Amber, 5600K Cyan, Silver Halide
-        vec3 warmTungsten = vec3(0.92, 0.68, 0.32); // #E09F3E
-        vec3 anamorphicCyan = vec3(0.32, 0.58, 0.76); // #4A7C9B
-        vec3 silverHalide = vec3(0.95, 0.95, 0.95);
-
+        // Dynamic Color Palette from Uniforms
         float colorFactor = sin(seed * 6.2831 + uTime * 0.15) * 0.5 + 0.5;
-        vec3 baseTone = mix(warmTungsten, anamorphicCyan, colorFactor);
-        vColor = mix(baseTone, silverHalide, seed * 0.4);
+        vec3 baseTone = mix(uColorPrimary, uColorSecondary, colorFactor);
+        vColor = mix(baseTone, uColorHighlight, seed * 0.4);
 
         // Alpha dissipation based on depth and gentle breathing
         vAlpha = smoothstep(-35.0, -8.0, mvPosition.z) * (0.35 + 0.45 * sin(uTime * 1.5 + seed * 12.0));
@@ -267,16 +317,21 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       }
     `;
 
+    const currentPresetConfig = PRESET_CONFIGS[preset] || PRESET_CONFIGS['silver-dust'];
+
     const material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
       uniforms: {
         uTime: { value: 0 },
         uMousePos: { value: new THREE.Vector2(-999, -999) },
-        uMouseRadius: { value: 6.5 }, // approx 120px in world space
+        uMouseRadius: { value: 6.5 },
         uMouseForce: { value: 3.8 },
         uShockwave: { value: new THREE.Vector3(0, 0, 0) },
-        uIntensity: { value: intensity },
+        uIntensity: { value: intensity * currentPresetConfig.intensityMultiplier },
+        uColorPrimary: { value: new THREE.Vector3(...currentPresetConfig.primary) },
+        uColorSecondary: { value: new THREE.Vector3(...currentPresetConfig.secondary) },
+        uColorHighlight: { value: new THREE.Vector3(...currentPresetConfig.highlight) },
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -286,7 +341,7 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
     const particleSystem = new THREE.Points(geometry, material);
     scene.add(particleSystem);
 
-    // 5. Cursor Trail Micro-Particle Sub-System (Silver dust following cursor path)
+    // 5. Cursor Trail Micro-Particle Sub-System
     const trailCount = 180;
     const trailGeometry = new THREE.BufferGeometry();
     const trailPositions = new Float32Array(trailCount * 3);
@@ -324,7 +379,6 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
           float dist = length(coord);
           if (dist > 0.5) discard;
           float falloff = smoothstep(0.5, 0.05, dist);
-          // Silver-white with subtle amber core
           vec3 trailColor = vec3(0.95, 0.92, 0.86);
           gl_FragColor = vec4(trailColor, vAlpha * falloff * 0.7);
         }
@@ -337,20 +391,36 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
     const trailSystem = new THREE.Points(trailGeometry, trailMaterial);
     scene.add(trailSystem);
 
-    // Trail buffer state
     let trailHead = 0;
 
     // 6. Interaction Coordinates & Shockwave Engine
     const worldMouse = new THREE.Vector2(-999, -999);
     let shockwaveState = { x: 0, y: 0, progress: 0, active: false };
 
-    // Screen to World Plane conversion
+    // Register trigger for external button
+    triggerRef.current = () => {
+      shockwaveState = {
+        x: (Math.random() - 0.5) * 6,
+        y: (Math.random() - 0.5) * 4,
+        progress: 0.001,
+        active: true,
+      };
+    };
+
+    // Register updater for preset
+    updatePresetRef.current = (newPreset: AtmosphericPreset, newIntensity: number) => {
+      const cfg = PRESET_CONFIGS[newPreset] || PRESET_CONFIGS['silver-dust'];
+      material.uniforms.uIntensity.value = newIntensity * cfg.intensityMultiplier;
+      material.uniforms.uColorPrimary.value.set(...cfg.primary);
+      material.uniforms.uColorSecondary.value.set(...cfg.secondary);
+      material.uniforms.uColorHighlight.value.set(...cfg.highlight);
+    };
+
     const screenToWorld = (clientX: number, clientY: number, target: THREE.Vector2) => {
       const rect = container.getBoundingClientRect();
       const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1);
 
-      // Frustum height at z=0 plane
       const fovRad = (camera.fov * Math.PI) / 180;
       const planeHeight = 2 * Math.tan(fovRad / 2) * camera.position.z;
       const planeWidth = planeHeight * camera.aspect;
@@ -363,7 +433,6 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       screenToWorld(e.clientX, e.clientY, worldMouse);
       material.uniforms.uMousePos.value.copy(worldMouse);
 
-      // Emit trail particle
       const pArr = trailPositions;
       const aArr = trailAlphas;
       const idx = trailHead * 3;
@@ -436,12 +505,10 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       const delta = clock.getDelta();
       const elapsedTime = clock.getElapsedTime();
 
-      // Update particle uniforms
       material.uniforms.uTime.value = elapsedTime;
 
-      // Update shockwave progression
       if (shockwaveState.active) {
-        shockwaveState.progress += delta * 1.35; // Expands in ~0.74s
+        shockwaveState.progress += delta * 1.35;
         if (shockwaveState.progress >= 1.0) {
           shockwaveState.active = false;
           shockwaveState.progress = 0;
@@ -455,13 +522,12 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
         }
       }
 
-      // Fade out trail particles
       const aArr = trailAlphas;
       const pArr = trailPositions;
       for (let t = 0; t < trailCount; t++) {
         if (aArr[t] > 0.001) {
-          aArr[t] -= delta * 1.6; // ~600ms decay
-          pArr[t * 3 + 1] += delta * 0.3; // gentle rise like cinema smoke
+          aArr[t] -= delta * 1.6;
+          pArr[t * 3 + 1] += delta * 0.3;
         } else {
           aArr[t] = 0;
         }
@@ -469,7 +535,6 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       trailGeometry.attributes.alpha.needsUpdate = true;
       trailGeometry.attributes.position.needsUpdate = true;
 
-      // Gentle camera parallax breathing
       camera.position.x = Math.sin(elapsedTime * 0.1) * 0.5;
       camera.position.y = Math.cos(elapsedTime * 0.08) * 0.4;
       camera.lookAt(0, 0, 0);
@@ -479,7 +544,6 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
 
     animate();
 
-    // 9. Clean Disposal on Unmount
     return () => {
       if (animationFrameId !== null) {
         cancelAnimationFrame(animationFrameId);
@@ -492,7 +556,9 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       observer.disconnect();
 
-      // Dispose Three.js objects
+      triggerRef.current = null;
+      updatePresetRef.current = null;
+
       geometry.dispose();
       material.dispose();
       trailGeometry.dispose();
@@ -503,7 +569,7 @@ export const ParticleUniverseCanvas: React.FC<ParticleUniverseCanvasProps> = ({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [intensity]);
+  }, []);
 
   return (
     <div
