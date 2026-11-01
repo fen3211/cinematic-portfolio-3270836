@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-canvas-primary: #080808;
+  --color-canvas-secondary: #111111;
+  --color-surface-elevated: #161616;
+  --color-border-hairline: #292929;
+  --color-border-subtle: #1F1F1F;
+  --color-text-primary: #F5F5F5;
+  --color-text-secondary: #888888;
+  --color-text-tertiary: #555555;
+  --color-text-muted: #444444;
+  --color-accent-amber: #E09F3E;
+  --color-accent-blue: #4A7C9B;
+  --color-status-rec: #D93829;
+  --color-neutral-daylight: #EDE6DD;
+
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border-hairline);
+  }
+
+  html {
+    scroll-behavior: auto; /* Handled smoothly by Lenis */
+    background-color: var(--color-canvas-primary);
+    color: var(--color-text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: var(--color-canvas-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Professional Camera HUD Tabular Numerics */
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom Minimalist Cinema Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #080808;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #292929;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E09F3E;
+}
+
+/* Focus Visible Accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-accent-amber);
+  outline-offset: 2px;
+}
+
+/* Lenis Recommended CSS */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* Film Vignette & Scrim Masking */
+.cinema-vignette {
+  background: radial-gradient(
+    circle at center,
+    transparent 55%,
+    rgba(8, 8, 8, 0.75) 100%
+  );
+}
+
+.cinema-scrim-top {
+  background: linear-gradient(
+    180deg,
+    rgba(8, 8, 8, 0.85) 0%,
+    rgba(8, 8, 8, 0.4) 50%,
+    transparent 100%
+  );
+}
+
+.cinema-scrim-bottom {
+  background: linear-gradient(
+    0deg,
+    rgba(8, 8, 8, 0.95) 0%,
+    rgba(8, 8, 8, 0.6) 40%,
+    transparent 100%
+  );
+}
+
+/* Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
